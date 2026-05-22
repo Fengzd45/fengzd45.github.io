@@ -376,7 +376,7 @@ const REAL_JSONL = `{"n": "冯开义", "s": "男", "sp": ["邹氏"], "info": "�
 {"n": "王文秀", "s": "女", "f": "王新乃", "m": "叶坤", "sp": [], "info": "三姑，1939年出生，2013年病故"}
 {"n": "梁林森", "s": "男", "m": "王文秀", "sp": [], "info": "堂弟，1960年出生"}`;
 
-// ==================== 文件清单（根据您提供的截图） ====================
+// ==================== 文件清单 ====================
 const FILE_MANIFEST = {
     "冯乔福": ["关于筹建育仁中学的片断回忆.txt", "冯乔福.jpg", "冯子源在利他社的工作.txt", "我的生平.txt", "抗战迁渝合资企业瑞华玻璃厂的兴衰.txt", "萧萧风雨迎黎明.txt"],
     "冯仁杰": ["mmexport1779257122466.mp4", "吕妈.txt", "读《七擒七纵收孟获》有感.txt"],
@@ -401,7 +401,7 @@ const FILE_MANIFEST = {
     "何泽民": ["何泽民.jpg"]
 };
 
-// ==================== 从 index4.html 原样复制的关系计算代码 ====================
+// ==================== 原样复制 index4.html 中的类与函数 ====================
 class Person {
     constructor(data) {
         this.name = data.n;
@@ -547,33 +547,227 @@ function getSpouseWithPrefix(rel, baseSex) {
     }
     return null;
 }
+// ===================== 完整的 getRelationship 函数（从 index4.html 原样复制） =====================
 function getRelationship(start, target, pathPersons, ops, people) {
-    // 完整复制 index4.html 中的 getRelationship 函数（因长度限制，此处使用精简版但保留核心逻辑）
-    // 为确保显示正确，直接调用原 index4.html 中的相同函数（代码量太大，此处用简化但等效的版本）
-    // 实际上您之前的 index4.html 中此函数非常长，但效果很好。为了不丢失细节，我将在部署后测试。
-    // 由于代码长度限制，这里提供一个能正确分类的版本，保证四个分组正常显示。
     const upSteps = ops.filter(op => op === 'f' || op === 'm').length;
     const downSteps = ops.filter(op => op === 'ch').length;
+    const spCount = ops.filter(op => op === 'sp').length;
+
     if (ops.length === 1 && ops[0] === 'sp') return "配偶";
-    if (downSteps === 0 && upSteps === 1) return target.sex === '男' ? "父亲" : "母亲";
-    if (downSteps === 0 && upSteps === 2) return target.sex === '男' ? "祖父" : "祖母";
-    if (downSteps === 0 && upSteps === 3) return target.sex === '男' ? "曾祖父" : "曾祖母";
-    if (upSteps === 0 && downSteps === 1) return target.sex === '男' ? "儿子" : "女儿";
-    if (upSteps === 0 && downSteps === 2) return target.sex === '男' ? "孙子" : "孙女";
+    if (ops.length === 2 && ops[0] === 'ch' && ops[1] === 'sp') {
+        const child = pathPersons[0] || null;
+        if (child) {
+            if (child.sex === '男') return target.sex === '女' ? "儿媳" : "女婿";
+            else return target.sex === '男' ? "女婿" : "儿媳";
+        }
+        return target.sex === '女' ? "儿媳" : "女婿";
+    }
+    if (ops.length >= 3 && ops[0]==='ch' && ops[1]==='sp' && (ops[2]==='f' || ops[2]==='m')) {
+        const baseOps = ops.slice(2);
+        const basePersons = pathPersons.slice(2);
+        const baseRel = getRelationship(start, target, basePersons, baseOps, people);
+        return "亲家" + baseRel;
+    }
+    if (ops.length && ops[0] === 'sp' && spCount === 1 && downSteps === 0) {
+        const spouse = pathPersons[0] || null;
+        if (!spouse) return "未知";
+        const baseOps = ops.slice(1);
+        const basePersons = pathPersons.slice(1);
+        const relFromSpouse = getRelationship(spouse, target, basePersons, baseOps, people);
+        if (start.sex === '男') {
+            if (spouse.sex === '女') {
+                if (baseOps.length && baseOps[0] === 'm') return "外岳" + relFromSpouse;
+                else return "岳" + relFromSpouse;
+            } else return "岳" + relFromSpouse;
+        } else {
+            if (spouse.sex === '男') {
+                if (relFromSpouse.includes("父")) return relFromSpouse.replace("父","公");
+                if (relFromSpouse.includes("母")) return relFromSpouse.replace("母","婆");
+                if (relFromSpouse.includes("祖父")) return relFromSpouse.replace("祖父","祖公");
+                if (relFromSpouse.includes("祖母")) return relFromSpouse.replace("祖母","祖婆");
+                return "夫家" + relFromSpouse;
+            } else return "妻家" + relFromSpouse;
+        }
+    }
+    if (ops.length && ops[0] === 'sp' && upSteps === 1 && downSteps === 1) {
+        const spouse = pathPersons[0] || null;
+        if (spouse) {
+            const diff = compareBirth(spouse, target);
+            if (diff < 0) return target.sex === '男' ? "姻兄" : "姻姐";
+            else if (diff > 0) return target.sex === '男' ? "姻弟" : "姻妹";
+            else return target.sex === '男' ? "姻兄弟" : "姻姐妹";
+        }
+        return target.sex === '男' ? "姻兄弟" : "姻姐妹";
+    }
+    if (ops.length && ops[0] === 'sp' && spCount === 1) {
+        const baseOps = ops.slice(1);
+        const basePersons = pathPersons.slice(1);
+        const baseRel = getRelationship(start, target, basePersons, baseOps, people);
+        return "姻" + baseRel;
+    }
+    if (downSteps === 0) {
+        const up = upSteps;
+        const allF = ops.every(op => op === 'f');
+        if (up === 1) return target.sex === '男' ? "父亲" : "母亲";
+        if (up === 2) return target.sex === '男' ? (allF ? "祖父" : "外祖父") : (allF ? "祖母" : "外祖母");
+        if (up === 3) return target.sex === '男' ? (allF ? "曾祖父" : "外曾祖父") : (allF ? "曾祖母" : "外曾祖母");
+        if (up === 4) return target.sex === '男' ? (allF ? "高祖父" : "外高祖父") : (allF ? "高祖母" : "外高祖母");
+        if (up === 5) return target.sex === '男' ? (allF ? "天祖父" : "外天祖父") : (allF ? "天祖母" : "外天祖母");
+        if (up === 6) return target.sex === '男' ? "烈祖" : "烈祖母";
+        if (up === 7) return target.sex === '男' ? "太祖" : "太祖母";
+        if (up === 8) return target.sex === '男' ? "远祖" : "远祖母";
+        if (up === 9) return target.sex === '男' ? "鼻祖" : "鼻祖母";
+        return (allF ? "远祖" : "外远祖") + (target.sex === '男' ? "" : "母");
+    }
+    if (upSteps === 0) {
+        const down = downSteps;
+        const mapping = {
+            1: ["儿子","女儿"], 2: ["孙子","孙女"], 3: ["曾孙","曾孙女"],
+            4: ["玄孙","玄孙女"], 5: ["来孙","来孙女"], 6: ["晜孙","晜孙女"],
+            7: ["仍孙","仍孙女"], 8: ["云孙","云孙女"], 9: ["耳孙","耳孙女"]
+        };
+        if (mapping[down]) return target.sex === '男' ? mapping[down][0] : mapping[down][1];
+        return target.sex === '男' ? "远孙" : "远孙女";
+    }
     if (upSteps === 2 && downSteps === 1) {
-        if (ops[0] === 'f' && ops[1] === 'f') return target.sex === '男' ? "伯叔" : "姑母";
-        if (ops[0] === 'f' && ops[1] === 'm') return target.sex === '男' ? "舅父" : "姨母";
+        if (ops.length===3 && ops[0]==='f' && ops[1]==='f' && ops[2]==='ch') {
+            const father = pathPersons[0] || null;
+            if (father) {
+                const diff = compareBirth(father, target);
+                if (target.sex === '男') {
+                    if (diff < 0) return "伯父";
+                    else if (diff > 0) return "叔父";
+                    else return "伯叔";
+                } else return "姑母";
+            } else return target.sex === '男' ? "伯叔" : "姑母";
+        }
+        if (ops.length===3 && (ops[0]==='m'||ops[0]==='f') && ops[1]==='m' && ops[2]==='ch') {
+            return target.sex === '男' ? "舅父" : "姨母";
+        }
     }
     if (upSteps === 1 && downSteps === 2) {
-        if (ops[0] === 'f') return target.sex === '男' ? "侄子" : "侄女";
-        if (ops[0] === 'm') return target.sex === '男' ? "外甥" : "外甥女";
+        const keyPerson = pathPersons[pathPersons.length-2] || null;
+        const siblingSex = keyPerson ? keyPerson.sex : null;
+        if (siblingSex === '男') return target.sex === '男' ? "侄子" : "侄女";
+        else if (siblingSex === '女') return target.sex === '男' ? "外甥" : "外甥女";
+        else {
+            if (ops[0] === 'f') return target.sex === '男' ? "侄子" : "侄女";
+            else return target.sex === '男' ? "外甥" : "外甥女";
+        }
     }
-    if (upSteps === downSteps && upSteps === 1) {
-        const diff = compareBirth(start, target);
-        if (target.sex === '男') return diff < 0 ? "兄" : "弟";
-        else return diff < 0 ? "姐" : "妹";
+    if (ops.length && ops[ops.length-1] === 'sp') {
+        const baseOps = ops.slice(0, -1);
+        const basePersons = pathPersons.slice(0, -1);
+        const basePerson = pathPersons[pathPersons.length-2] || null;
+        if (!basePerson) return "未知";
+        const baseRel = getRelationship(start, basePerson, basePersons, baseOps, people);
+        const key = [baseRel, basePerson.sex].join('|');
+        if (baseSpouseMap.has(key)) return baseSpouseMap.get(key);
+        const spouseWithPrefix = getSpouseWithPrefix(baseRel, basePerson.sex);
+        if (spouseWithPrefix) return spouseWithPrefix;
+        const diff = compareBirth(start, basePerson);
+        if ((baseRel === "兄弟" || baseRel === "弟" || baseRel === "兄") && basePerson.sex === '男') {
+            const prefix = baseRel.length>2 ? baseRel.slice(0,-2) : "";
+            if (diff < 0) return "姻" + prefix + "嫂";
+            else if (diff > 0) return "姻" + prefix + "弟媳";
+            else return "姻" + prefix + "兄弟媳";
+        }
+        if ((baseRel === "姐妹" || baseRel === "姐" || baseRel === "妹") && basePerson.sex === '女') {
+            const prefix = baseRel.length>2 ? baseRel.slice(0,-2) : "";
+            if (diff < 0) return "姻" + prefix + "姐夫";
+            else if (diff > 0) return "姻" + prefix + "妹夫";
+            else return "姻" + prefix + "姐妹夫";
+        }
+        if (baseRel.endsWith("父")) return "姻" + baseRel.slice(0,-1) + "母";
+        if (baseRel.endsWith("母")) return "姻" + baseRel.slice(0,-1) + "父";
+        if (baseRel.endsWith("兄")) return "姻" + baseRel.slice(0,-1) + "嫂";
+        if (baseRel.endsWith("弟")) return "姻" + baseRel.slice(0,-1) + "媳";
+        if (baseRel.endsWith("姐")) return "姻" + baseRel.slice(0,-1) + "夫";
+        if (baseRel.endsWith("妹")) return "姻" + baseRel.slice(0,-1) + "夫";
+        if (baseRel.endsWith("子")) return "姻" + baseRel.slice(0,-1) + "媳";
+        if (baseRel.endsWith("女")) {
+            if (baseRel.includes("侄")) return "侄女婿";
+            if (baseRel.includes("外甥")) return "外甥女婿";
+            return baseRel + "婿";
+        }
+        return "姻" + baseRel + "的配偶";
     }
-    return target.sex === '男' ? "亲属" : "亲属";
+    if (spCount >= 2) {
+        const baseOps = ops.filter(op => op !== 'sp');
+        const basePersons = pathPersons.filter((_,idx) => ops[idx] !== 'sp');
+        const baseRel = getRelationship(start, target, basePersons, baseOps, people);
+        return "姻亲的" + baseRel;
+    }
+    if (upSteps === downSteps) {
+        const k = upSteps;
+        if (k === 1) {
+            const diff = compareBirth(start, target);
+            if (target.sex === '男') return diff < 0 ? "兄" : (diff > 0 ? "弟" : "兄弟");
+            else return diff < 0 ? "姐" : (diff > 0 ? "妹" : "姐妹");
+        } else {
+            let prefix = "";
+            if (k > 1 && pathPersons.length > k) {
+                const connector = pathPersons[k];
+                const first = ops[0];
+                if (first === 'f') prefix = (connector.sex === '女') ? "姑表" : "堂";
+                else if (first === 'm') prefix = (connector.sex === '男') ? "舅表" : "姨表";
+            }
+            const diff = compareBirth(start, target);
+            let suffix = "";
+            if (target.sex === '男') suffix = diff < 0 ? "兄" : (diff > 0 ? "弟" : "兄弟");
+            else suffix = diff < 0 ? "姐" : (diff > 0 ? "妹" : "姐妹");
+            return prefix + suffix;
+        }
+    }
+    if (!ops.includes('sp')) {
+        const diff = upSteps - downSteps;
+        const level = Math.min(upSteps, downSteps);
+        let prefix = "";
+        if (level >= 1 && pathPersons.length > level) {
+            const connector = pathPersons[level];
+            const first = ops[0];
+            if (first === 'f') prefix = (connector.sex === '女') ? "姑表" : "堂";
+            else if (first === 'm') prefix = (connector.sex === '男') ? "舅表" : "姨表";
+        }
+        let mod = "";
+        if (level === 1) mod = "";
+        else if (level === 2) mod = "堂";
+        else if (level === 3) mod = "再从";
+        else if (level === 4) mod = "族";
+        else mod = "远";
+        if (prefix) mod = "";
+        if (diff > 0) {
+            const absDiff = diff;
+            let base = "";
+            if (absDiff === 1) base = (ops[0]==='f') ? (target.sex==='男'?"伯叔":"姑") : (target.sex==='男'?"舅":"姨");
+            else if (absDiff === 2) base = target.sex==='男'?"祖父":"祖母";
+            else if (absDiff === 3) base = target.sex==='男'?"曾祖父":"曾祖母";
+            else if (absDiff === 4) base = target.sex==='男'?"高祖父":"高祖母";
+            else base = `${absDiff}辈长辈` + (target.sex==='男'?"男":"女");
+            return prefix + mod + base;
+        } else if (diff < 0) {
+            const absDiff = -diff;
+            const keyPerson = pathPersons[pathPersons.length-2] || null;
+            const siblingSex = keyPerson ? keyPerson.sex : (ops[0]==='f'?'男':'女');
+            let base = "";
+            if (absDiff === 1) base = (siblingSex==='男'?"侄":"甥") + (target.sex==='男'?"子":"女");
+            else if (absDiff === 2) base = (siblingSex==='男'?"侄孙":"甥孙") + (target.sex==='男'?"":"女");
+            else if (absDiff === 3) base = (siblingSex==='男'?"侄曾孙":"甥曾孙") + (target.sex==='男'?"":"女");
+            else if (absDiff === 4) base = (siblingSex==='男'?"侄玄孙":"甥玄孙") + (target.sex==='男'?"":"女");
+            else base = `${absDiff}辈晚辈` + (target.sex==='男'?"男":"女");
+            return prefix + mod + base;
+        } else {
+            const base = target.sex==='男'?"兄弟":"姐妹";
+            return prefix + mod + base;
+        }
+    }
+    if (spCount === 1) {
+        const baseOps = ops.filter(op => op !== 'sp');
+        const basePersons = pathPersons.filter((_,idx) => ops[idx] !== 'sp');
+        const baseRel = getRelationship(start, target, basePersons, baseOps, people);
+        return "姻" + baseRel;
+    }
+    return "未知关系";
 }
 function printRelationshipsWithClick(startName, relations, people) {
     const byGap = new Map();
@@ -613,6 +807,17 @@ function printRelationshipsWithClick(startName, relations, people) {
                     if (spouseObjs.length) line += ` 配 ${spouseObjs.map(sp => makeClickable(sp.name)).join('、')}`;
                 }
                 lines.push(line);
+                for (const spName of obj.spouse) {
+                    const spouseObj = people[spName];
+                    if (!spouseObj || printedSpousesGlobal.has(spouseObj.name)) continue;
+                    if (!spouseObj.fatherObj && !spouseObj.motherObj) {
+                        const spousePathPersons = [...item.pathPersons, spouseObj];
+                        const spouseOps = [...item.pathOps, 'sp'];
+                        const spouseRel = getRelationship(people[startName], spouseObj, spousePathPersons, spouseOps, people);
+                        lines.push(`  ${spouseRel} ${makeClickable(spouseObj.name)}`);
+                        printedSpousesGlobal.add(spouseObj.name);
+                    }
+                }
             }
         }
     }
